@@ -3,19 +3,16 @@ import mill.eval._
 import mill.scalalib._
 import mill.scalalib.publish._
 import mill.scalalib.scalafmt._
-
 import ammonite.ops._
 import mill.modules.Jvm.runSubprocess
-
 import coursier.maven.MavenRepository
-
 import $file.jmh
 import jmh.Jmh
 import $file.headers
 import headers.Headers
-
 import $file.mdoc
 import mdoc.MdocModule
+import text.ivy
 
 val millVersion = System.getProperty("MILL_VERSION")
 
@@ -130,7 +127,7 @@ object slumps extends SwamModule with PublishModule {
 
   def artifactName = "swam-slumps"
 
-  def ivyDeps = Agg(ivy"com.github.pureconfig::pureconfig-enumeratum:$pureconfigVersion")
+  def ivyDeps = Agg(ivy"com.github.pureconfig::pureconfig-enumeratum:$pureconfigVersion", ivy"com.lihaoyi::fastparse:2.1.3")
 
   def pomSettings =
     PomSettings(

@@ -7,7 +7,7 @@ import better.files.File
 import cats.effect._
 import swam.binary.ModuleParser
 import swam.slumps.Slumps
-import swam.slumps.internals.Souper
+import swam.slumps.internals.{Souper, SouperParser}
 import swam.test.util.testfiles
 import swam.{binary, slumps, validation}
 import swam.validation.Validator
@@ -24,6 +24,7 @@ object SouperTests extends TestSuite {
 
 
   val slumps = Slumps[IO]
+  val parser = new SouperParser
   var souper = Souper.apply()
 
   def run(wast: String) = {
@@ -32,12 +33,22 @@ object SouperTests extends TestSuite {
   }
 
   def runSouper(candidate: File): Unit ={
-    println(souper.inferLHS(candidate.contentAsString()))
+    println(souper.inferRHS(candidate.contentAsString()))
   }
+
+
+  def runParser(candidate: File, mergeResult: File): Unit ={
+
+
+  }
+
 
 
   val tests = Tests {
     "Souper IR" - runSouper(better.files.File("slumps/test/resources/souper/souperIr1.txt"))
+    "Parsing and merging" - runParser(better.files.File("slumps/test/resources/souper/souperIr1.txt"),
+      better.files.File("slumps/test/resources/souper/souperIr2.txt"))
+
   }
 
 
