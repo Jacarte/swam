@@ -18,6 +18,7 @@ syntax: glob
 
 # idea
 .idea
+.idea_modules
 *.iml
 
 # building

@@ -17,7 +17,7 @@ import headers.Headers
 import $file.mdoc
 import mdoc.MdocModule
 
-// val millVersion = System.getProperty("MILL_VERSION")
+val millVersion = System.getProperty("MILL_VERSION")
 
 
 // interp.load.ivy("com.lihaoyi" %% "mill-contrib-bloop" % millVersion)
@@ -27,6 +27,7 @@ import mdoc.MdocModule
 
 
 import $ivy.`com.lihaoyi::mill-contrib-bloop:$MILL_VERSION`
+
 
 val swamVersion = "0.4.0"
 
@@ -150,7 +151,7 @@ object slumps extends SwamModule with PublishModule {
 
     def moduleDeps = Seq(slumps, runtime, text, util.test, core)
 
-    object to_souper extends Tests with ScalafmtModule {
+    object souper extends Tests with ScalafmtModule {
       def moduleDeps = super.moduleDeps ++ Seq(slumps.test)
       def testFrameworks = Seq("swam.util.Framework")
     }
