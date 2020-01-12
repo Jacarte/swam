@@ -24,6 +24,7 @@ class Souper private (val conf: SlumpsConfiguration) {
 
   def inferLHS(LHS: String):String = {
 
+    println(LHS)
     (s"${conf.souperBinPath}/souper-check ${conf.souperArgs.mkString(" ")} -z3-path=${conf.zSolver} -" #< getInput(LHS)).lazyLines_!.mkString("\n")
 
   }

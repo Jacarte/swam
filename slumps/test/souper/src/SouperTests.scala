@@ -3,10 +3,12 @@ package swam
 package slumps
 package test
 
+import better.files.File
 import cats.effect._
 import swam.binary.ModuleParser
 import swam.slumps.Slumps
 import swam.slumps.internals.Souper
+import swam.test.util.testfiles
 import swam.{binary, slumps, validation}
 import swam.validation.Validator
 import utest._
@@ -29,12 +31,14 @@ object SouperTests extends TestSuite {
       slumps
   }
 
-  def runSouper(): Unit ={
-    println(souper.inferLHS("%0:i32 = var\ninfer %0"))
+  def runSouper(candidate: File): Unit ={
+    println(souper.inferLHS(candidate.contentAsString()))
   }
 
-  val tests = Tests{
-    "Calling Souper" - runSouper()
+
+  val tests = Tests {
+    "Souper IR" - runSouper(better.files.File("slumps/test/resources/souper/souperIr1.txt"))
   }
+
 
 }

@@ -1,0 +1,5 @@
+; CHECK: mul 6:i32, %0
+%0:i32 = var
+%1:i32 = mul %0, 2:i32
+%2:i32 = mul %1, 3:i32
+infer %2
