@@ -30,7 +30,7 @@ object SouperTests extends TestSuite {
   }
 
   def runSouper(): Unit ={
-    souper.inferLHS("Test")
+    println(souper.inferLHS("%0:i32 = var\ninfer %0"))
   }
 
   val tests = Tests{

@@ -7,16 +7,25 @@ package slumps
 package internals
 
 
+import java.io.{ByteArrayInputStream, File, InputStream, StringBufferInputStream, StringReader}
+import java.net.URL
+
 import cats.effect.Effect
 import config._
 import pureconfig._
 import pureconfig.generic.auto._
 
+import scala.sys._
+import scala.sys.process._
+
 class Souper private (val conf: SlumpsConfiguration) {
 
+  private def getInput(in:String): InputStream = new ByteArrayInputStream(in.getBytes("UTF-8"))
+
   def inferLHS(LHS: String):String = {
-    println(conf.souperArgs)
-    ""
+
+    (s"${conf.souperBinPath}/souper-check ${conf.souperArgs.mkString(" ")} -z3-path=${conf.zSolver} -" #< getInput(LHS)).lazyLines_!.mkString("\n")
+
   }
 
 }

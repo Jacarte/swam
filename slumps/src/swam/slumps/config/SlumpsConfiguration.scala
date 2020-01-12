@@ -11,4 +11,4 @@ package config
   *
   * @param souperBinPath Path to souper bin.
   */
-case class SlumpsConfiguration(souperBinPath: String, souperArgs: List[String])
+case class SlumpsConfiguration(souperBinPath: String, souperArgs: List[String], zSolver: String)
