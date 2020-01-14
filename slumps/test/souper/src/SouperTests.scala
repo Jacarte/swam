@@ -13,6 +13,8 @@ import swam.{binary, slumps, validation}
 import swam.validation.Validator
 import utest._
 
+import fastparse._
+
 import scala.concurrent.ExecutionContext
 
 
@@ -39,6 +41,9 @@ object SouperTests extends TestSuite {
 
   def runParser(candidate: File, mergeResult: File): Unit ={
 
+    val graph = parse(candidate.contentAsString, parser.dag(_)).get.value
+
+    println(graph.entry)
 
   }
 
@@ -46,7 +51,7 @@ object SouperTests extends TestSuite {
 
   val tests = Tests {
     "Souper IR" - runSouper(better.files.File("slumps/test/resources/souper/souperIr1.txt"))
-    "Parsing and merging" - runParser(better.files.File("slumps/test/resources/souper/souperIr1.txt"),
+    "Parsing and merging" - runParser(better.files.File("slumps/test/resources/souper/souperIr3.txt"),
       better.files.File("slumps/test/resources/souper/souperIr2.txt"))
 
   }
