@@ -1,36 +1,23 @@
-
 package swam
 package slumps
 package test
 
 import java.io.PrintWriter
 import java.nio.ByteBuffer
-
-import better.files.File
-import cats.effect._
-import swam.binary.ModuleParser
-import swam.slumps.Slumps
-import swam.slumps.internals.{Souper, SouperParser}
-import swam.test.util.testfiles
-import swam.{binary, slumps, validation}
-import swam.validation.Validator
-import utest._
-import fastparse._
-import swam.runtime.{Engine, Instance}
-
-import scala.concurrent.ExecutionContext
-import runtime._
-import formats.DefaultFormatters._
-import cats.effect._
 import java.nio.file.Paths
 import java.util.concurrent.Executors
 
-import cats.effect.{Blocker, ContextShift, IO}
-import swam.runtime.imports.{AsInstance, AsInterface, Elem, Imports, TCMap}
-import swam.runtime.trace.{CustomTracerConfiguration, EventType, HandlerType, JULTracer, SocketHanndlerCondiguration, TraceConfiguration, Tracer, TracerFileHandlerCondiguration}
+import better.files.File
+import cats.effect.{Blocker, IO}
+import swam.runtime.formats.DefaultFormatters._
+import swam.runtime.imports.{AsInstance, AsInterface, Imports, TCMap}
+import swam.runtime.trace.{EventType, Tracer}
+import swam.runtime.{Engine, Instance, _}
+import utest._
 
+import scala.concurrent.ExecutionContext
 
-class STRACTracer(val file: PrintWriter) extends Tracer{
+class STRACTracer(val file: PrintWriter) extends Tracer {
   override def traceEvent(tpe: EventType, args: List[String]): Unit = {
     file.write(s"${tpe.entryName},${args.mkString(",")}\n")
   }
@@ -38,19 +25,16 @@ class STRACTracer(val file: PrintWriter) extends Tracer{
 
 object SouperTests extends TestSuite {
 
-
   implicit val cs = IO.contextShift(ExecutionContext.Implicits.global)
 
   type AsIIO[T] = AsInterface[T, IO]
   type AsIsIO[T] = AsInstance[T, IO]
-
 
   val blockingPool = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
   val blocker: Blocker = Blocker.liftExecutionContext(blockingPool)
 
   def printf(l: Any): IO[Unit] =
     IO(println(l))
-
 
   def printi32(i: Int): IO[Unit] =
     IO(println(i))
@@ -71,7 +55,7 @@ object SouperTests extends TestSuite {
     IO(println(s"$d1 $d2"))
 
   def print(i: Int, j: Int): IO[Int] = {
-    IO({println("print");  0})
+    IO({ println("print"); 0 })
   }
 
   def buffer = {
@@ -82,15 +66,16 @@ object SouperTests extends TestSuite {
 
   def stdlib =
     Imports[IO](
-      TCMap[String, AsIsIO]("env" -> TCMap[String, AsIIO](
-        "memory" -> buffer,
-        "printf" -> print _
-      )))
+      TCMap[String, AsIsIO](
+        "env" -> TCMap[String, AsIIO](
+          "memory" -> buffer,
+          "printf" -> print _
+        )))
 
   def instantiate(p: String, tr: Tracer): Instance[IO] =
     (for {
       engine <- Engine[IO](Option(tr))
-      m <- engine.instantiateBytes(fs2.io.file.readAll[IO](Paths.get(p), blocker, 4096),stdlib)
+      m <- engine.instantiateBytes(fs2.io.file.readAll[IO](Paths.get(p), blocker, 4096), stdlib)
     } yield m).unsafeRunSync()
 
   def time[T](t: => T): T = {
@@ -102,7 +87,6 @@ object SouperTests extends TestSuite {
   }
 
   def runAndTrace(name: String, f: File): Unit = {
-
 
     val file = new PrintWriter(new java.io.File(s"${name}.strac.log"))
 
@@ -121,18 +105,16 @@ object SouperTests extends TestSuite {
 
   }
 
-
   val tests = Tests {
-    "babbage problem [0]" - runAndTrace("bp[0]", better.files.File("slumps/test/resources/slumps/babbage_problem[0].wasm"))
+    "babbage problem [0]" - runAndTrace("bp[0]",
+                                        better.files.File("slumps/test/resources/slumps/babbage_problem[0].wasm"))
     "babbage problem" - runAndTrace("bp", better.files.File("slumps/test/resources/slumps/babbage_problem.wasm"))
-    "babbage problem [2]" - runAndTrace("bp[2]", better.files.File("slumps/test/resources/slumps/babbage_problem[2].wasm"))
-    "babbage problem [1]" - runAndTrace("bp[1]", better.files.File("slumps/test/resources/slumps/babbage_problem[1].wasm"))
-
-
-
+    "babbage problem [2]" - runAndTrace("bp[2]",
+                                        better.files.File("slumps/test/resources/slumps/babbage_problem[2].wasm"))
+    "babbage problem [1]" - runAndTrace("bp[1]",
+                                        better.files.File("slumps/test/resources/slumps/babbage_problem[1].wasm"))
     // "Bitwise OI [10]" - runAndTrace(better.files.File("slumps/test/resources/slumps/bitwise_IO[10].wasm"))
     // "Bitwie IO[5 7 9]" - runAndTrace(better.files.File("slumps/test/resources/slumps/bitwise_IO[5_7_9].wasm"))
   }
-
 
 }
