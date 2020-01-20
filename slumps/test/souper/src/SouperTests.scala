@@ -7,7 +7,6 @@ import java.nio.ByteBuffer
 import java.nio.file.Paths
 import java.util.concurrent.Executors
 
-import better.files.File
 import cats.effect.{Blocker, IO}
 import swam.runtime.formats.DefaultFormatters._
 import swam.runtime.imports.{AsInstance, AsInterface, Imports, TCMap}
@@ -86,35 +85,70 @@ object SouperTests extends TestSuite {
     res
   }
 
-  def runAndTrace(name: String, f: File): Unit = {
-
-    val file = new PrintWriter(new java.io.File(s"${name}.strac.log"))
-
-    val tracer = new STRACTracer(file)
-
-    val i = instantiate(f.path.toString, tracer)
-
-    i.interpreter.interpret(2, Vector(), i)
-
-    println(i.module.functions.toList.map(t => t.code.length).sum)
-
-    file.flush()
-    file.close()
-
-    //println(i.exports.function("__original_main").unsafeRunSync())
-
-  }
-
   val tests = Tests {
-    "babbage problem [0]" - runAndTrace("bp[0]",
-                                        better.files.File("slumps/test/resources/slumps/babbage_problem[0].wasm"))
-    "babbage problem" - runAndTrace("bp", better.files.File("slumps/test/resources/slumps/babbage_problem.wasm"))
-    "babbage problem [2]" - runAndTrace("bp[2]",
-                                        better.files.File("slumps/test/resources/slumps/babbage_problem[2].wasm"))
-    "babbage problem [1]" - runAndTrace("bp[1]",
-                                        better.files.File("slumps/test/resources/slumps/babbage_problem[1].wasm"))
-    // "Bitwise OI [10]" - runAndTrace(better.files.File("slumps/test/resources/slumps/bitwise_IO[10].wasm"))
-    // "Bitwie IO[5 7 9]" - runAndTrace(better.files.File("slumps/test/resources/slumps/bitwise_IO[5_7_9].wasm"))
+    def runAndTrace()(implicit path: utest.framework.TestPath): Unit = {
+      val fname = path.value.last.toString()
+      val logFile = new PrintWriter(new java.io.File(s"${fname}.strac.log"))
+      val tracer = new STRACTracer(logFile)
+      val i = instantiate(fname, tracer)
+
+      i.interpreter.interpret(2, Vector(), i)
+      println(i.module.functions.toList.map(t => t.code.length).sum)
+
+      logFile.flush()
+      logFile.close()
+      //println(i.exports.function("__original_main").unsafeRunSync())
+    }
+
+    test("slumps/test/resources/slumps/bitwise_IO[4_10].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/resistor_mesh.wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[5_10].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[2_5_7_9].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/Banker's_algorithm.wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[2_5_7_10].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[9].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[7_9].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO.wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[2_10].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[2_4_10].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/babbage_problem[1].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[2_7_10].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[2_7_9].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[4].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/aliquot_sequence_classifications_1.wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[5_7_10].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/flipping_bits_game.wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[2_7].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[5_7].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/sqlite3.wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[2_4_9].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[7].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[2_5_9].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[4_9].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/eban_numbers.wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[5_7_9].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[5].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/babbage_problem[0].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[2_5_10].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/babbage_problem.wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[2_5_7].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[2_4_7_10].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[4_7_9].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[2].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[4_7].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[2_9].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[2_4_7].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[10].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[2_4].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[5_9].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[2_5].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[2_4_7_9].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[7_10].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/zebra_puzzle.wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/flipping_bits_game[0].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/paraffins.wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/babbage_problem[2].wasm") { runAndTrace() }
+    test("slumps/test/resources/slumps/bitwise_IO[4_7_10].wasm") { runAndTrace() }
   }
 
 }
