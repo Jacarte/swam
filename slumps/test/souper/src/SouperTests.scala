@@ -26,6 +26,7 @@ import java.util.concurrent.Executors
 
 import cats.effect.{Blocker, ContextShift, IO}
 import swam.runtime.imports.{AsInstance, AsInterface, Elem, Imports, TCMap}
+import swam.runtime.trace.{CustomTracerConfiguration, HandlerType, JULTracer, SocketHanndlerCondiguration, TraceConfiguration, Tracer, TracerFileHandlerCondiguration}
 
 
 object SouperTests extends TestSuite {
@@ -36,20 +37,14 @@ object SouperTests extends TestSuite {
   type AsIIO[T] = AsInterface[T, IO]
   type AsIsIO[T] = AsInstance[T, IO]
 
-  val slumps = Slumps[IO]
-  val parser = new SouperParser
-  var souper = Souper.apply()
-
-  def run(wast: String) = {
-
-      slumps
-  }
-
 
   val blockingPool = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
   val blocker: Blocker = Blocker.liftExecutionContext(blockingPool)
 
-  val engine = Engine[IO]
+
+
+
+
 
 
   def printf(l: Any): IO[Unit] =
@@ -91,9 +86,9 @@ object SouperTests extends TestSuite {
         "printf" -> print _
       )))
 
-  def instantiate(p: String): Instance[IO] =
+  def instantiate(p: String, tr: JULTracer): Instance[IO] =
     (for {
-      engine <- engine
+      engine <- Engine[IO](Option(tr))
       m <- engine.instantiateBytes(fs2.io.file.readAll[IO](Paths.get(p), blocker, 4096),stdlib)
     } yield m).unsafeRunSync()
 
@@ -105,17 +100,42 @@ object SouperTests extends TestSuite {
     res
   }
 
-  def runAndTrace(f: File): Unit = {
+  def runAndTrace(name: String, f: File): Unit = {
 
-    val i = instantiate(f.path.toString)
 
-    val main = i.exports.typed.function2[Int, Int, Int]("main").unsafeRunSync()
+    val conf: TraceConfiguration = TraceConfiguration(
+      HandlerType.File,
+      "\n",
+      "*",
+      "ALL",
+      TracerFileHandlerCondiguration(
+        s"${name}-log.txt",
+        append = true,
+        "."
+      ),
+      SocketHanndlerCondiguration("localhost", 8080),
+      CustomTracerConfiguration("unknown")
+    )
+
+
+
+    val i = instantiate(f.path.toString, new JULTracer(conf))
+    i.interpreter.interpret(2, Vector(), i)
+    println(i.module.functions.toList.map(t => t.code.length).sum)
+
+    //println(i.exports.function("__original_main").unsafeRunSync())
 
   }
 
 
   val tests = Tests {
-    "babbage problem" - runAndTrace(better.files.File("slumps/test/resources/slumps/babbage_problem[0].wasm"))
+    "babbage problem [0]" - runAndTrace("bp[0]", better.files.File("slumps/test/resources/slumps/babbage_problem[0].wasm"))
+    "babbage problem" - runAndTrace("bp", better.files.File("slumps/test/resources/slumps/babbage_problem.wasm"))
+    "babbage problem [2]" - runAndTrace("bp[2]", better.files.File("slumps/test/resources/slumps/babbage_problem[2].wasm"))
+    "babbage problem [1]" - runAndTrace("bp[1]", better.files.File("slumps/test/resources/slumps/babbage_problem[1].wasm"))
+
+    // "Bitwise OI [10]" - runAndTrace(better.files.File("slumps/test/resources/slumps/bitwise_IO[10].wasm"))
+    // "Bitwie IO[5 7 9]" - runAndTrace(better.files.File("slumps/test/resources/slumps/bitwise_IO[5_7_9].wasm"))
   }
 
 

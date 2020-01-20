@@ -58,7 +58,7 @@ class JULTracer(conf: TraceConfiguration) extends Tracer {
 private object PureFormatter extends Formatter {
 
   override def format(x: LogRecord): String =
-    s"${x.getMillis()},${x.getMessage()}"
+    s"${x.getMessage()}"
 
 }
 

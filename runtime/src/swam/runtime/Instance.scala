@@ -31,7 +31,7 @@ import java.nio.ByteBuffer
   *
   * @param module The [[Module]] of this instance.
   */
-class Instance[F[_]] private[runtime] (val module: Module[F], private[runtime] val interpreter: Interpreter[F]) {
+class Instance[F[_]] private[runtime] (val module: Module[F], val interpreter: Interpreter[F]) {
   self =>
 
   /** Gives access to all exported fields of this instance. */

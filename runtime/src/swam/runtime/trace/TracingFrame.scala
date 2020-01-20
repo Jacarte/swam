@@ -160,26 +160,40 @@ private[runtime] class TracingFrame[F[_]](inner: Frame[F], tracer: Tracer) exten
   def fetch(): AsmInst[F] =
     inner.fetch()
 
-  def jumpTo(idx: Int): Unit =
+  def jumpTo(idx: Int): Unit = {
+    tracer.traceEvent(EventType.Jmp, List("jmp", idx.toString))
     inner.jumpTo(idx)
+  }
 
-  def local(idx: Int): Long =
+  def local(idx: Int): Long = {
+    tracer.traceEvent(EventType.GLocal, List("glocal", idx.toString))
     inner.local(idx)
+  }
 
-  def setLocal(idx: Int, v: Long): Unit =
+  def setLocal(idx: Int, v: Long): Unit = {
+    tracer.traceEvent(EventType.SLocal, List("slocal", idx.toString))
     inner.setLocal(idx, v)
+  }
 
-  def global(idx: Int): Global[F] =
+  def global(idx: Int): Global[F] = {
+    tracer.traceEvent(EventType.GGlobal, List("gglobal", idx.toString))
     inner.global(idx)
+  }
 
-  def memory(idx: Int): Memory[F] =
+  def memory(idx: Int): Memory[F] = {
+    tracer.traceEvent(EventType.GMem, List("gmem", idx.toString))
     inner.memory(idx)
+  }
 
-  def func(fidx: Int): Function[F] =
+  def func(fidx: Int): Function[F] = {
+    tracer.traceEvent(EventType.Call, List("call", fidx.toString))
     inner.func(fidx)
+  }
 
-  def table(idx: Int): Table[F] =
+  def table(idx: Int): Table[F] = {
+    tracer.traceEvent(EventType.Table, List("table", idx.toString))
     inner.table(idx)
+  }
 
   def module: Module[F] =
     inner.module

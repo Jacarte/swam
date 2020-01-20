@@ -28,7 +28,17 @@ object EventType extends Enum[EventType] {
   case object MWrite extends EventType
   case object MGrow extends EventType
   case object SPush extends EventType
+  case object Jmp extends EventType
   case object SPop extends EventType
+  case object Table extends EventType
+
+  case object GLocal extends EventType
+  case object GMem extends EventType
+  case object Call extends EventType
+  case object SMem extends EventType
+  case object SLocal extends EventType
+  case object GGlobal extends EventType
+  case object SGlobal extends EventType
   case object SPeek extends EventType
 
   def values = findValues
