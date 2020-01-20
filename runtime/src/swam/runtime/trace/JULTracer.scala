@@ -50,8 +50,9 @@ class JULTracer(conf: TraceConfiguration) extends Tracer {
   logger.addHandler(handler)
 
   def traceEvent(tpe: EventType, args: List[String]): Unit =
-    if (conf.filter.equals("*") || tpe.entryName.matches(conf.filter))
+    if (conf.filter.equals("*") || tpe.entryName.matches(conf.filter)) {
       logger.info(s"${tpe.entryName},${args.mkString(",")}${conf.separator}")
+    }
 
 }
 
