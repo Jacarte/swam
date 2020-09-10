@@ -1,7 +1,5 @@
 package swam
-package cli
-
-// import swam.cli.Server.{parseMessage, randomCoverageFiller, readSocket, serializeMessage, writeSocket}
+package cli_server
 
 import scala.collection.mutable.ListBuffer
 import java.io._
@@ -14,6 +12,7 @@ import swam.code_analysis.coverage.CoverageListener
 import swam.runtime.{Function, Value}
 import com.typesafe.config.ConfigFactory
 import swam.runtime.wasi.internal.ExitCodeException
+import swam.cli.Main.{executeFunction}
 
 // Server which listens to a socket to get instructions to start the WASM file with specific arguments
 // and write the coverage back in the socket in the AFL binary format directly
@@ -76,8 +75,8 @@ object Server {
 
       var exitCode = 0
       try {
-        Main.executeFunction(preparedFunction, argsParsed, time)
-        // val result = Main.executeFunction(preparedFunction, argsParsed, time)
+        executeFunction(preparedFunction, argsParsed, time)
+        // val result = executeFunction(preparedFunction, argsParsed, time)
         // println(s"Result of calculation: $result")
       } catch {
         // case e: swam.runtime.StackOverflowException => println(e)

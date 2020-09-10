@@ -35,21 +35,6 @@ case class Run(file: Path,
                wasmArgTypes: List[String])
     extends Options
 
-case class RunServer(file: Path,
-                     args: List[String],
-                     main: String,
-                     wat: Boolean,
-                     wasi: Boolean,
-                     time: Boolean,
-                     trace: Boolean,
-                     traceFilter: String,
-                     traceFile: Path,
-                     dirs: List[Path],
-                     debug: Boolean,
-                     filter: Boolean,
-                     wasmArgTypes: List[String])
-    extends Options
-
 case class Decompile(file: Path, textual: Boolean, out: Option[Path]) extends Options
 
 case class Validate(file: Path, wat: Boolean, dev: Boolean) extends Options

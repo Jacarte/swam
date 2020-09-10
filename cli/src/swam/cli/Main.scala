@@ -155,27 +155,6 @@ object Main extends CommandIOApp(name = "swam-cli", header = "Swam from the comm
     }
   }
 
-  val serverOpts: Opts[Options] =
-    Opts.subcommand("run_server", "Run a socket for a given WASM that listens to inputs") {
-      // TODO: Check which ones of these are really necessary
-      (mainFun,
-       wat,
-       wasi,
-       time,
-       dirs,
-       trace,
-       traceFile,
-       filter,
-       debug,
-       wasmFile,
-       restArguments,
-       covfilter,
-       wasmArgTypes)
-        .mapN { (main, wat, wasi, time, dirs, trace, traceFile, filter, debug, wasm, args, covfilter, wasmArgTypes) =>
-          RunServer(wasm, args, main, wat, wasi, time, trace, filter, traceFile, dirs, debug, covfilter, wasmArgTypes)
-        }
-    }
-
   val decompileOpts: Opts[Options] = Opts.subcommand("decompile", "Decompile a wasm file") {
     (textual, wasmFile, out.orNone).mapN { (textual, wasm, out) => Decompile(wasm, textual, out) }
   }
@@ -197,7 +176,6 @@ object Main extends CommandIOApp(name = "swam-cli", header = "Swam from the comm
 
   def main: Opts[IO[ExitCode]] =
     runOpts
-      .orElse(serverOpts)
       .orElse(covOpts)
       .orElse(inferOpts)
       .orElse(decompileOpts)
@@ -260,39 +238,6 @@ object Main extends CommandIOApp(name = "swam-cli", header = "Swam from the comm
                 _ <- IO(CoverageReporter.blockCoverage(covOut, file, coverageListener))
               } yield ExitCode.Success
 
-            case RunServer(file,
-                           args,
-                           main,
-                           wat,
-                           wasi,
-                           time,
-                           trace,
-                           filter,
-                           tracef,
-                           dirs,
-                           debug,
-                           covfilter,
-                           wasmArgTypes) =>
-              for {
-                tracer <- if (trace)
-                  JULTracer[IO](blocker,
-                                traceFolder = ".",
-                                traceNamePattern = tracef.toAbsolutePath().toString(),
-                                filter = filter,
-                                formatter = NoTimestampFormatter).map(Some(_))
-                else
-                  IO(None)
-                coverageListener = CoverageListener[IO](covfilter)
-                engine <- Engine[IO](blocker, tracer, listener = Option(coverageListener))
-                tcompiler <- Compiler[IO](blocker)
-                module = if (wat) tcompiler.stream(file, debug, blocker) else engine.sections(file, blocker)
-                compiled <- engine.compile(module)
-                preparedFunction <- prepareFunction(compiled, main, dirs, args, wasi, blocker)
-                _ <- IO(
-                  Server
-                    .listen(IO(preparedFunction), wasmArgTypes, time, file, coverageListener))
-              } yield ExitCode.Success
-
             case Decompile(file, textual, out) =>
               for {
                 decompiler <- if (textual)
@@ -339,7 +284,6 @@ object Main extends CommandIOApp(name = "swam-cli", header = "Swam from the comm
                       if (func.nonEmpty) {
 
                         if (func.size > 1) {
-
                           System.err.println(s"Warning $func_name has more than one definition, taking the first one")
                         }
 
