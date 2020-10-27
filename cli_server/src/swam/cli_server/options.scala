@@ -32,6 +32,5 @@ case class RunServer(file: Path,
                      traceFile: Path,
                      dirs: List[Path],
                      debug: Boolean,
-                     filter: Boolean,
-                     wasmArgTypes: List[String])
+                     filter: Boolean)
     extends Options

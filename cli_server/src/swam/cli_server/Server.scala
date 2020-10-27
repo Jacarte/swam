@@ -12,6 +12,7 @@ import swam.code_analysis.coverage.CoverageListener
 import swam.runtime.{Function, Value}
 import com.typesafe.config.ConfigFactory
 import swam.runtime.wasi.internal.ExitCodeException
+import swam.ValType.{F32, F64, I32, I64}
 import swam.cli.Main.{executeFunction}
 
 // Server which listens to a socket to get instructions to start the WASM file with specific arguments
@@ -19,12 +20,12 @@ import swam.cli.Main.{executeFunction}
 object Server {
   val conf = ConfigFactory.load()
   val maxQueue = 50000
-  val port = conf.getInt("swam.cli.server.port")
+  val port = conf.getInt("swam.cli_server.server.port")
   val server = new ServerSocket(port, maxQueue)
 
   def listen(
       preparedFunction: IO[Function[IO]],
-      wasmArgTypes: List[String],
+      wasmArgTypes: Vector[ValType],
       time: Boolean,
       watOrWasm: Path,
       coverageListener: CoverageListener[IO]
@@ -53,7 +54,7 @@ object Server {
 
   class ConnectionThread(
       preparedFunction: IO[Function[IO]],
-      wasmArgTypes: List[String],
+      wasmArgTypes: Vector[ValType],
       time: Boolean,
       watOrWasm: Path,
       coverageListener: CoverageListener[IO],
@@ -110,7 +111,7 @@ object Server {
   }
 
   // Parses received message to Wasm Input (Int32, Int64, Float32, Float64)
-  def parseMessage(input: Array[Byte], argsTypes: List[String], requiredBufferSize: Int): Vector[Value] = {
+  def parseMessage(input: Array[Byte], argsTypes: Vector[ValType], requiredBufferSize: Int): Vector[Value] = {
 
     val parameterList = new ListBuffer[Value]()
     var byteIndex = 0
@@ -122,24 +123,22 @@ object Server {
 
     for (argType <- argsTypes) {
       argType match {
-        case "Int32" => {
+        case I32 => {
           parameterList += Value.Int32(ByteBuffer.wrap(paddedInput.slice(byteIndex, byteIndex + 4)).getInt)
           byteIndex += 4
         }
-        case "Int64" => {
+        case I64 => {
           parameterList += Value.Int64(ByteBuffer.wrap(paddedInput.slice(byteIndex, byteIndex + 8)).getLong)
           byteIndex += 8
         }
-        case "Float32" => {
+        case F32 => {
           parameterList += Value.Float32(ByteBuffer.wrap(paddedInput.slice(byteIndex, byteIndex + 4)).getFloat)
           byteIndex += 4
         }
-        case "Float64" => {
+        case F64 => {
           parameterList += Value.Float64(ByteBuffer.wrap(paddedInput.slice(byteIndex, byteIndex + 8)).getDouble)
           byteIndex += 8
         }
-        case unknownType =>
-          throw new Exception("Type does not exist for Wasm: " + unknownType)
       }
     }
     parameterList.toVector
@@ -171,18 +170,18 @@ object Server {
 
   // AFL's input length will be varying a lot - we need to know what the required Byte Array size is for
   // our function's input.
-  def getRequiredBufferSize(argsTypes: List[String]): Int = {
+  def getRequiredBufferSize(argsTypes: Vector[ValType]): Int = {
     var bufferSize = 0
     for (argType <- argsTypes) {
       System.err.println("argType: " + argType)
       argType match {
-        case "Int32" =>
+        case I32 =>
           bufferSize += 4
-        case "Int64" =>
+        case I64 =>
           bufferSize += 8
-        case "Float32" =>
+        case F32 =>
           bufferSize += 4
-        case "Float64" =>
+        case F64 =>
           bufferSize += 8
         case unknownType =>
           throw new Exception("Type does not exist for Wasm: " + unknownType)

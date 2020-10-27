@@ -1,32 +1,14 @@
 package swam
 package cli_server
 
-import java.nio.file.{Path, Paths, StandardOpenOption}
+import java.nio.file.StandardOpenOption
 import java.util.logging.{LogRecord, Formatter => JFormatter}
 
 import cats.effect.{Blocker, ExitCode, IO}
 import cats.implicits._
 import com.monovore.decline.Opts
 import com.monovore.decline.effect.CommandIOApp
-import swam.cli.Main.{
-  prepareFunction,
-  wasmFile,
-  func_name,
-  restArguments,
-  wasmArgTypes,
-  dirs,
-  mainFun,
-  wat,
-  wasi,
-  time,
-  trace,
-  covfilter,
-  covOut,
-  filter,
-  traceFile,
-  debug,
-  out
-}
+import swam.cli.Main.{covfilter, debug, dirs, filter, inferSignature, mainFun, prepareFunction, restArguments, time, trace, traceFile, wasi, wasmFile, wat}
 import swam.code_analysis.coverage.CoverageListener
 import swam.runtime.Engine
 import swam.runtime.imports._
@@ -59,10 +41,9 @@ object Main extends CommandIOApp(name = "swam-server-cli", header = "Swam server
        debug,
        wasmFile,
        restArguments,
-       covfilter,
-       wasmArgTypes)
-        .mapN { (main, wat, wasi, time, dirs, trace, traceFile, filter, debug, wasm, args, covfilter, wasmArgTypes) =>
-          RunServer(wasm, args, main, wat, wasi, time, trace, filter, traceFile, dirs, debug, covfilter, wasmArgTypes)
+       covfilter)
+        .mapN { (main, wat, wasi, time, dirs, trace, traceFile, filter, debug, wasm, args, covfilter) =>
+          RunServer(wasm, args, main, wat, wasi, time, trace, filter, traceFile, dirs, debug, covfilter)
         }
     }
 
@@ -84,8 +65,7 @@ object Main extends CommandIOApp(name = "swam-server-cli", header = "Swam server
                            tracef,
                            dirs,
                            debug,
-                           covfilter,
-                           wasmArgTypes) =>
+                           covfilter) =>
               for {
                 tracer <- if (trace)
                   JULTracer[IO](blocker,
@@ -95,12 +75,12 @@ object Main extends CommandIOApp(name = "swam-server-cli", header = "Swam server
                                 formatter = NoTimestampFormatter).map(Some(_))
                 else
                   IO(None)
-                // TODO: Use swam.cli.Main.inferSignature here to get wasmArgTypes
                 coverageListener = CoverageListener[IO](covfilter)
                 engine <- Engine[IO](blocker, tracer, listener = Option(coverageListener))
                 tcompiler <- Compiler[IO](blocker)
                 module = if (wat) tcompiler.stream(file, debug, blocker) else engine.sections(file, blocker)
                 compiled <- engine.compile(module)
+                wasmArgTypes <- inferSignature(compiled, main)
                 preparedFunction <- prepareFunction(compiled, main, dirs, args, wasi, blocker)
                 _ <- IO(
                   Server
