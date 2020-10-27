@@ -27,23 +27,12 @@ object Main extends CommandIOApp(name = "swam-server-cli", header = "Swam server
 
   ////// CLI-COMMAND ARGUMENT COMBINATIONS //////
 
-  val serverOpts: Opts[Options] =
-    Opts.subcommand("run_server", "Run a socket for a given WASM that listens to inputs") {
-      // TODO: Check which ones of these are really necessary
-      (mainFun,
-       wat,
-       wasi,
-       time,
-       dirs,
-       trace,
-       traceFile,
-       filter,
-       debug,
-       wasmFile,
-       restArguments,
-       covfilter)
-        .mapN { (main, wat, wasi, time, dirs, trace, traceFile, filter, debug, wasm, args, covfilter) =>
-          RunServer(wasm, args, main, wat, wasi, time, trace, filter, traceFile, dirs, debug, covfilter)
+    val serverOpts: Opts[Options] =
+        Opts.subcommand("run_server", "Run a socket for a given WASM that listens to inputs") {
+        // TODO: Check which ones of these are really necessary
+        (mainFun, wat, wasi, time, dirs, trace, traceFile, filter, debug, wasmFile, restArguments, wasiOption, covfilter)
+        .mapN { (main, wat, wasi, time, dirs, trace, traceFile, filter, debug, wasm, args, wasiOption, covfilter) =>
+            RunServer(wasm, args, main, wat, wasi, time, trace, filter, traceFile, dirs, debug, wasiOption, covfilter)
         }
     }
 

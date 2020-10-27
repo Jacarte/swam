@@ -19,6 +19,8 @@ package cli_server
 
 import java.nio.file.Path
 
+import runtime.wasi.WasiOption
+
 sealed trait Options
 
 case class RunServer(file: Path,
@@ -32,5 +34,6 @@ case class RunServer(file: Path,
                      traceFile: Path,
                      dirs: List[Path],
                      debug: Boolean,
-                     filter: Boolean)
+                     filter: Boolean,
+                     wasiOption: WasiOption)
     extends Options

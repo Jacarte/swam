@@ -17,6 +17,8 @@
 package swam
 package cli
 
+import runtime.wasi.WasiOption
+
 import java.nio.file.Path
 
 sealed trait Options
@@ -31,12 +33,13 @@ case class Run(file: Path,
                traceFilter: String,
                traceFile: Path,
                dirs: List[Path],
-               debug: Boolean)
+               debug: Boolean,
+               wasiOption: WasiOption)
     extends Options
 
-case class Decompile(file: Path, textual: Boolean, out: Option[Path]) extends Options
+case class Decompile(file: Path, textual: Boolean, out: Option[Path], readChunkSize: Int) extends Options
 
-case class Validate(file: Path, wat: Boolean, dev: Boolean) extends Options
+case class Validate(file: Path, wat: Boolean, dev: Boolean, readChunkSize: Int) extends Options
 
 case class Compile(file: Path, out: Path, debug: Boolean) extends Options
 
@@ -51,8 +54,11 @@ case class WasmCov(file: Path,
                    traceFile: Path,
                    dirs: List[Path],
                    debug: Boolean,
+                   exportInstrumented: Path,
                    covOut: Path,
-                   filter: Boolean)
+                   filter: Boolean,
+                   wasiOption: WasiOption,
+                   validate: Boolean)
     extends Options
 
 case class Infer(file: Path, wat: Boolean, main: String) extends Options

@@ -25,6 +25,7 @@ import cats.effect.concurrent.Deferred
 import io.odin._
 
 private[wasi] class WasiImpl[F[_]](
+    val options: List[WasiOption],
     val args: List[String],
     val manager: HandleManager[F],
     val mem: Deferred[F, Memory[F]],
@@ -37,4 +38,6 @@ private[wasi] class WasiImpl[F[_]](
     with FileOps[F]
     with PathOps[F]
     with SockOps[F]
-    with MiscOps[F]
+    with MiscOps[F] {
+  val version = "wasi_snapshot_preview1"
+}
