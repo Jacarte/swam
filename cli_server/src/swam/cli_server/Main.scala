@@ -8,7 +8,7 @@ import cats.effect.{Blocker, ExitCode, IO}
 import cats.implicits._
 import com.monovore.decline.Opts
 import com.monovore.decline.effect.CommandIOApp
-import swam.cli.Main.{covfilter, debug, dirs, filter, inferSignature, mainFun, prepareFunction, restArguments, time, trace, traceFile, wasi, wasmFile, wat}
+import swam.cli.Main.{inferSignature, prepareFunction, wasiOption, covfilter, debug, dirs, filter, mainFun, restArguments, time, trace, traceFile, wasi, wasmFile, wat}
 import swam.code_analysis.coverage.CoverageListener
 import swam.runtime.Engine
 import swam.runtime.imports._
@@ -30,9 +30,9 @@ object Main extends CommandIOApp(name = "swam-server-cli", header = "Swam server
     val serverOpts: Opts[Options] =
         Opts.subcommand("run_server", "Run a socket for a given WASM that listens to inputs") {
         // TODO: Check which ones of these are really necessary
-        (mainFun, wat, wasi, time, dirs, trace, traceFile, filter, debug, wasmFile, restArguments, wasiOption, covfilter)
-        .mapN { (main, wat, wasi, time, dirs, trace, traceFile, filter, debug, wasm, args, wasiOption, covfilter) =>
-            RunServer(wasm, args, main, wat, wasi, time, trace, filter, traceFile, dirs, debug, wasiOption, covfilter)
+        (               mainFun, wat, wasi, time, dirs, trace, traceFile, filter, debug, wasmFile, restArguments, covfilter, wasiOption)
+        .mapN { (       main, wat, wasi, time, dirs, trace, traceFile, filter, debug, wasm, args, covfilter, wasiOption) =>
+            RunServer(  wasm, args, main, wat, wasi, time, trace, filter, traceFile, dirs, debug, covfilter, wasiOption)
         }
     }
 
@@ -54,7 +54,8 @@ object Main extends CommandIOApp(name = "swam-server-cli", header = "Swam server
                            tracef,
                            dirs,
                            debug,
-                           covfilter) =>
+                           covfilter,
+                          wasiOption) =>
               for {
                 tracer <- if (trace)
                   JULTracer[IO](blocker,
@@ -70,7 +71,7 @@ object Main extends CommandIOApp(name = "swam-server-cli", header = "Swam server
                 module = if (wat) tcompiler.stream(file, debug, blocker) else engine.sections(file, blocker)
                 compiled <- engine.compile(module)
                 wasmArgTypes <- inferSignature(compiled, main)
-                preparedFunction <- prepareFunction(compiled, main, dirs, args, wasi, blocker)
+                preparedFunction <- prepareFunction(compiled, wasiOption, main, dirs, args, wasi, blocker)
                 _ <- IO(
                   Server
                     .listen(IO(preparedFunction), wasmArgTypes, time, file, coverageListener))
