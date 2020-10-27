@@ -31,8 +31,7 @@ case class Run(file: Path,
                traceFilter: String,
                traceFile: Path,
                dirs: List[Path],
-               debug: Boolean,
-               wasmArgTypes: List[String])
+               debug: Boolean)
     extends Options
 
 case class Decompile(file: Path, textual: Boolean, out: Option[Path]) extends Options
@@ -53,8 +52,7 @@ case class WasmCov(file: Path,
                    dirs: List[Path],
                    debug: Boolean,
                    covOut: Path,
-                   filter: Boolean,
-                   wasmArgTypes: List[String])
+                   filter: Boolean)
     extends Options
 
-case class Infer(file: Path, wat: Boolean, functionName: String) extends Options
+case class Infer(file: Path, wat: Boolean, main: String) extends Options

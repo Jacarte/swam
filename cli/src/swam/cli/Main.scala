@@ -41,18 +41,9 @@ object Main extends CommandIOApp(name = "swam-cli", header = "Swam from the comm
   val wasmFile =
     Opts.argument[Path](metavar = "wasm")
 
-  val func_name =
-    Opts.argument[String](metavar = "functionName")
-
   // Arguments that get passed to the WASM code you execute. They are available through WASI args_get.
   val restArguments =
     Opts.arguments[String](metavar = "args").orEmpty
-
-  val wasmArgTypes = Opts
-    .options[String]("argType",
-      help = "Input parameter types for Wasm function. Possible values: Int32, Int64, Float32, Float64.",
-      short = "aT")
-    .orEmpty
 
   val dirs = Opts
     .options[Path]("dir", "Preopen directory", short = "D", metavar = "dir")
@@ -116,9 +107,9 @@ object Main extends CommandIOApp(name = "swam-cli", header = "Swam from the comm
   ////// CLI-COMMAND ARGUMENT COMBINATIONS //////
 
   val runOpts: Opts[Options] = Opts.subcommand("run", "Run a WebAssembly file") {
-    (mainFun, wat, wasi, time, dirs, trace, traceFile, filter, debug, wasmFile, restArguments, wasmArgTypes).mapN {
-      (main, wat, wasi, time, dirs, trace, traceFile, filter, debug, wasm, args, wasmArgTypes) =>
-        Run(wasm, args, main, wat, wasi, time, trace, filter, traceFile, dirs, debug, wasmArgTypes)
+    (mainFun, wat, wasi, time, dirs, trace, traceFile, filter, debug, wasmFile, restArguments).mapN {
+      (main, wat, wasi, time, dirs, trace, traceFile, filter, debug, wasm, args) =>
+        Run(wasm, args, main, wat, wasi, time, trace, filter, traceFile, dirs, debug)
     }
   }
 
@@ -135,9 +126,8 @@ object Main extends CommandIOApp(name = "swam-cli", header = "Swam from the comm
       wasmFile,
       restArguments,
       covOut,
-      covfilter,
-      wasmArgTypes).mapN {
-      (main, wat, wasi, time, dirs, trace, traceFile, filter, debug, wasm, args, covOut, covfilter, wasmArgTypes) =>
+      covfilter).mapN {
+      (main, wat, wasi, time, dirs, trace, traceFile, filter, debug, wasm, args, covOut, covfilter) =>
         WasmCov(wasm,
           args,
           main,
@@ -150,8 +140,7 @@ object Main extends CommandIOApp(name = "swam-cli", header = "Swam from the comm
           dirs,
           debug,
           covOut,
-          covfilter,
-          wasmArgTypes)
+          covfilter)
     }
   }
 
@@ -161,7 +150,7 @@ object Main extends CommandIOApp(name = "swam-cli", header = "Swam from the comm
 
   val inferOpts: Opts[Options] =
     Opts.subcommand("infer", "Get the parameters type for functions file in Wasm module.") {
-      (wasmFile, wat, func_name).mapN { (wasm, wat, func_name) => Infer(wasm, wat, func_name) }
+      (wasmFile, wat, mainFun).mapN { (wasm, wat, main) => Infer(wasm, wat, main) }
     }
 
   val validateOpts: Opts[Options] = Opts.subcommand("validate", "Validate a wasm file") {
@@ -184,7 +173,7 @@ object Main extends CommandIOApp(name = "swam-cli", header = "Swam from the comm
       .map { opts =>
         Blocker[IO].use { blocker =>
           opts match {
-            case Run(file, args, main, wat, wasi, time, trace, filter, tracef, dirs, debug, wasmArgTypes) =>
+            case Run(file, args, main, wat, wasi, time, trace, filter, tracef, dirs, debug) =>
               for {
                 tracer <- if (trace)
                   JULTracer[IO](blocker,
@@ -194,31 +183,18 @@ object Main extends CommandIOApp(name = "swam-cli", header = "Swam from the comm
                     formatter = NoTimestampFormatter).map(Some(_))
                 else
                   IO(None)
-                // TODO: Use inferSignature() to get wasmArgTypes
-                argsParsed <- IO(parseWasmArgs(wasmArgTypes, args))
                 engine <- Engine[IO](blocker, tracer)
                 tcompiler <- Compiler[IO](blocker)
                 module = if (wat) tcompiler.stream(file, debug, blocker) else engine.sections(file, blocker)
                 compiled <- engine.compile(module)
+                wasmArgTypes <- inferSignature(compiled, main)
+                argsParsed <- IO(createInputVector(wasmArgTypes, args))
                 preparedFunction <- prepareFunction(compiled, main, dirs, args, wasi, blocker)
                 _ <- IO(executeFunction(IO(preparedFunction), argsParsed, time))
               } yield ExitCode.Success
 
             // TODO: Remove this and instead to coverage flag in Run(...)
-            case WasmCov(file,
-            args,
-            main,
-            wat,
-            wasi,
-            time,
-            trace,
-            filter,
-            tracef,
-            dirs,
-            debug,
-            covOut,
-            covfilter,
-            wasmArgTypes) =>
+            case WasmCov(file, args, main, wat, wasi, time, trace, filter, tracef, dirs, debug, covOut, covfilter) =>
               for {
                 tracer <- if (trace)
                   JULTracer[IO](blocker,
@@ -228,13 +204,13 @@ object Main extends CommandIOApp(name = "swam-cli", header = "Swam from the comm
                     formatter = NoTimestampFormatter).map(Some(_))
                 else
                   IO(None)
-                // TODO: Use inferSignature() to get wasmArgTypes
-                argsParsed <- IO(parseWasmArgs(wasmArgTypes, args))
                 coverageListener = CoverageListener[IO](covfilter)
                 engine <- Engine[IO](blocker, tracer, listener = Option(coverageListener))
                 tcompiler <- swam.text.Compiler[IO](blocker)
                 module = if (wat) tcompiler.stream(file, debug, blocker) else engine.sections(file, blocker)
                 compiled <- engine.compile(module)
+                wasmArgTypes <- inferSignature(compiled, main)
+                argsParsed <- IO(createInputVector(wasmArgTypes, args))
                 preparedFunction <- prepareFunction(compiled, main, dirs, args, wasi, blocker)
                 _ <- IO(executeFunction(IO(preparedFunction), argsParsed, time))
                 _ <- IO(CoverageReporter.blockCoverage(covOut, file, coverageListener))
@@ -270,13 +246,14 @@ object Main extends CommandIOApp(name = "swam-cli", header = "Swam from the comm
                 res <- engine.validate(module).attempt
                 _ <- res.fold(t => logger.error("Module is invalid", t), _ => logger.info("Module is valid"))
               } yield ExitCode.Success
-            case Infer(file, wat, func_name) =>
+
+            case Infer(file, wat, main) =>
               for {
                 engine <- Engine[IO](blocker)
                 tcompiler <- swam.text.Compiler[IO](blocker)
                 module = if (wat) tcompiler.stream(file, false, blocker) else engine.sections(file, blocker)
                 compiled <- engine.compile(module)
-                functionArgTypes <- inferSignature(compiled, file, wat, func_name)
+                functionArgTypes <- inferSignature(compiled, main)
                 params <- IO(functionArgTypes.map {
                   case I32 => "Int32"
                   case I64 => "Int64"
@@ -285,6 +262,7 @@ object Main extends CommandIOApp(name = "swam-cli", header = "Swam from the comm
                 })
                 _ <- IO(println(params.mkString(",")))
               } yield ExitCode.Success
+
             case Compile(file, out, debug) =>
               for {
                 tcompiler <- Compiler[IO](blocker)
@@ -301,49 +279,49 @@ object Main extends CommandIOApp(name = "swam-cli", header = "Swam from the comm
         }
       }
 
-  // TODO: Fix this
-  def inferSignature(compiled: Module[IO], file: Path, wat: Boolean, functionName: String): IO[Vector[ValType]] = {
+  def inferSignature(compiled: Module[IO], funcName: String): IO[Vector[ValType]] = {
     for {
-      allFuncs <- compiled.names.flatMap(_.subsections.collectFirst { case FunctionNames(n) => n })
-      matchingFuncs <- allFuncs.filter { case (_, name) => functionName == name }
-      if (matchingFuncs.isEmpty) {
-        System.err.println(s"Function '$func_name' does not exist. Listing available functions...")
-        allFuncs.foreach(f => f.foreach(e => println(s"\t${e._2}")))
-        IO.raiseError(new Exception("Function '$func_name' does not exist."))
-      }
+      allFuncsOpt <- IO(compiled.names.flatMap(_.subsections.collectFirst { case FunctionNames(n) => n }))
+      signature <- IO(
+        allFuncsOpt match {
+          case None => throw new Exception("The module does not contain a name/metadata section")
+          case Some(allFuncs) => {
+            val matchingFuncs = allFuncs.filter { case (_, name) => funcName == name }
+            if (matchingFuncs.isEmpty) {
+              System.err.println(s"Function '$funcName' does not exist. Listing available functions...")
+              val functionsAvailable = allFuncs.map{case (_, value) => value}.mkString("\t")
+              throw new Exception(s"Function '$funcName' does not exist. Available functions: $functionsAvailable")
+            } else {
+              if (matchingFuncs.size > 1) {
+                System.err.println(s"Warning $funcName has more than one definition, taking the first one")
+              }
+              val funcIdx = matchingFuncs.collectFirst { case (tid, _) => tid }.get
 
-      functionArgTypes <- IO(
-        allFuncs match {
-          case Map[int, aString] => {
-        val matchingFuncs = x.filter {
-        case (_, name) => functionName == name
-        }
+              // There is always one at this point
+              val funcType = compiled.functions.filter (f => f.idx == funcIdx) (0).tpe
 
-        if (! matchingFuncs.nonEmpty) {
-        System.err.println (s"Function '$func_name' does not exist. Listing available functions...")
-        allFuncs.foreach (f => f.foreach (e => println (s"\t${
-        e._2
-        }") ) )
-        IO.raiseError (new Exception ("Function '$func_name' does not exist.") )
-        }
-
-        if (matchingFuncs.size > 1) {
-        System.err.println (s"Warning $func_name has more than one definition, taking the first one")
-        }
-
-        val funcIdx = matchingFuncs.collectFirst {
-        case (tid, _) => tid
-        }.get
-
-          // There is always one at this point
-        val funcType = compiled.functions.filter (f => f.idx == funcIdx) (0).tpe
-
-        funcType.params
-        }
-          case None => IO.raiseError(new Exception("The module does not contain a name/metadata section"))
+              funcType.params
+            }
+          }
         }
       )
-    } yield functionArgTypes
+    } yield signature
+  }
+
+  // Create the required input vector for the instantiated Wasm function
+  def createInputVector(argsTypes: Vector[ValType], args: List[String]): Vector[Value] = {
+    if (argsTypes.length != args.length)
+      throw new Exception("Number of args not equal to number of arg types!")
+    argsTypes.zipWithIndex.map {
+      case (I32, index) =>
+        Value.Int32(args(index).toInt)
+      case (I64, index) =>
+        Value.Int64(args(index).toLong)
+      case (F32, index) =>
+        Value.Float32(args(index).toFloat)
+      case (F64, index) =>
+        Value.Float64(args(index).toDouble)
+    }
   }
 
   def prepareFunction(module: Module[IO],
@@ -390,22 +368,4 @@ object Main extends CommandIOApp(name = "swam-cli", header = "Swam from the comm
       end <- Clock[IO].monotonic(TimeUnit.NANOSECONDS)
       _ <- logger.info(s"Execution took ${end - start}ns")
     } yield res
-
-  // Create the required input vector for the instantiated Wasm function
-  def parseWasmArgs(argsTypes: List[String], args: List[String]): Vector[Value] = {
-    if (argsTypes.length != args.length)
-      throw new Exception("Number of args not equal to number of arg types!")
-    argsTypes.zipWithIndex.map {
-      case ("Int32", index) =>
-        Value.Int32(args(index).toInt)
-      case ("Int64", index) =>
-        Value.Int64(args(index).toLong)
-      case ("Float32", index) =>
-        Value.Float32(args(index).toFloat)
-      case ("Float64", index) =>
-        Value.Float64(args(index).toDouble)
-      case (unknownType, _) =>
-        throw new Exception("Type does not exist for Wasm: " + unknownType)
-    }.toVector
-  }
 }
