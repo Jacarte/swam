@@ -40,22 +40,6 @@ case class Run(file: Path,
                wasmArgTypes: List[String])
     extends Options
 
-case class RunServer(file: Path,
-                     args: List[String],
-                     main: String,
-                     wat: Boolean,
-                     wasi: Boolean,
-                     time: Boolean,
-                     trace: Boolean,
-                     traceFilter: String,
-                     traceFile: Path,
-                     dirs: List[Path],
-                     debug: Boolean,
-                     wasiOption: WasiOption,
-                     filterOutWASI: Boolean,
-                     wasmArgTypes: List[String])
-    extends Options
-
 case class Decompile(file: Path, textual: Boolean, out: Option[Path], readChunkSize: Int) extends Options
 
 case class Validate(file: Path, wat: Boolean, dev: Boolean, readChunkSize: Int) extends Options
@@ -82,4 +66,4 @@ case class WasmCov(file: Path,
                    validate: Boolean)
     extends Options
 
-case class Infer(file: Path, wat: Boolean, functionName: String) extends Options
+case class Infer(file: Path, wat: Boolean, main: String) extends Options

@@ -144,6 +144,18 @@ object cli extends SwamModule {
 
 }
 
+object cli_server extends SwamModule {
+
+  def moduleDeps = Seq(cli, text, core, runtime, wasi, code_analysis)
+
+  def ivyDeps = Agg(
+    ivy"com.github.pureconfig::pureconfig-enumeratum:$pureconfigVersion",
+    ivy"com.monovore::decline-effect:1.2.0",
+    ivy"com.monovore::decline:1.2.0"
+  )
+
+}
+
 object runtime extends SwamModule with PublishModule {
 
   def moduleDeps = Seq(core)

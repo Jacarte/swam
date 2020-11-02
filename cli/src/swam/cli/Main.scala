@@ -5,7 +5,7 @@ import java.nio.file.{Path, Paths, StandardOpenOption}
 import java.util.concurrent.TimeUnit
 import java.util.logging.{LogRecord, Formatter => JFormatter}
 
-import cats.effect.{Blocker, Clock, ExitCode, IO}
+import cats.effect._
 import cats.implicits._
 import com.monovore.decline.Opts
 import com.monovore.decline.effect.CommandIOApp
@@ -21,17 +21,14 @@ import swam.code_analysis.coverage.{CoverageListener, CoverageReporter}
 import swam.runtime.imports._
 import swam.runtime.trace._
 import swam.runtime.wasi.{Wasi, WasiOption}
-import swam.runtime.{Engine, Function, Memory, Module, Value}
+import swam.runtime.{Engine, Function, Module, Value}
 import swam.text.Compiler
-import swam.binary.custom.{FunctionNames, ModuleName}
-import swam.cli.Main.wasiOption
 import swam.code_analysis.coverage.instrument.{
   GlobalBasedCallbackInstrumenter,
   InstrumentationType,
   Instrumenter,
   JSCallbackInstrumenter
 }
-import swam.runtime.internals.compiler.CompiledFunction
 
 private object NoTimestampFormatter extends JFormatter {
   override def format(x: LogRecord): String =
@@ -218,55 +215,6 @@ object Main extends CommandIOApp(name = "swam-cli", header = "Swam from the comm
     }
   }
 
-  val serverOpts: Opts[Options] =
-    Opts.subcommand("run_server", "Run a socket for a given WASM that listens to inputs") {
-      // TODO: Check which ones of these are really necessary
-      (mainFun,
-       wat,
-       wasi,
-       time,
-       dirs,
-       trace,
-       traceFile,
-       filter,
-       debug,
-       wasmFile,
-       restArguments,
-       wasiOption,
-       covfilter,
-       wasmArgTypes)
-        .mapN {
-          (main,
-           wat,
-           wasi,
-           time,
-           dirs,
-           trace,
-           traceFile,
-           filter,
-           debug,
-           wasm,
-           args,
-           wasiOption,
-           covfilter,
-           wasmArgTypes) =>
-            RunServer(wasm,
-                      args,
-                      main,
-                      wat,
-                      wasi,
-                      time,
-                      trace,
-                      filter,
-                      traceFile,
-                      dirs,
-                      debug,
-                      wasiOption,
-                      covfilter,
-                      wasmArgTypes)
-        }
-    }
-
   val decompileOpts: Opts[Options] = Opts.subcommand("decompile", "Decompile a wasm file") {
     (wasmFile, textual, out.orNone, readChunkSize).mapN(Decompile(_, _, _, _))
     (textual, wasmFile, out.orNone, readChunkSizeOpt).mapN { (textual, wasm, out, chunkSize) =>
@@ -276,7 +224,7 @@ object Main extends CommandIOApp(name = "swam-cli", header = "Swam from the comm
 
   val inferOpts: Opts[Options] =
     Opts.subcommand("infer", "Get the parameters type for functions file in Wasm module.") {
-      (wasmFile, wat, func_name).mapN { (wasm, wat, func_name) => Infer(wasm, wat, func_name) }
+      (wasmFile, wat, mainFun).mapN { (wasm, wat, main) => Infer(wasm, wat, main) }
     }
 
   val validateOpts: Opts[Options] = Opts.subcommand("validate", "Validate a wasm file") {
@@ -292,7 +240,6 @@ object Main extends CommandIOApp(name = "swam-cli", header = "Swam from the comm
 
   def main: Opts[IO[ExitCode]] =
     runOpts
-      .orElse(serverOpts)
       .orElse(covOpts)
       .orElse(inferOpts)
       .orElse(decompileOpts)
@@ -311,7 +258,7 @@ object Main extends CommandIOApp(name = "swam-cli", header = "Swam from the comm
                                 formatter = NoTimestampFormatter).map(Some(_))
                 else
                   IO(None)
-                argsParsed <- IO(parseWasmArgs(wasmArgTypes, args))
+                argsParsed <- IO(swam.cli.utils.parseWasmArgs(wasmArgTypes, args))
                 engine <- Engine[IO](blocker, tracer)
                 tcompiler <- Compiler[IO](blocker)
                 module = if (wat) tcompiler.stream(file, debug, blocker) else engine.sections(file, blocker)
@@ -348,7 +295,7 @@ object Main extends CommandIOApp(name = "swam-cli", header = "Swam from the comm
                                 formatter = NoTimestampFormatter).map(Some(_))
                 else
                   IO(None)
-                argsParsed <- IO(parseWasmArgs(wasmArgTypes, args))
+                argsParsed <- IO(swam.cli.utils.parseWasmArgs(wasmArgTypes, args))
                 instrumenter: Option[Instrumenter[IO]] = if (exportInstrumented != null)
                   instrumentationType match {
                     case InstrumentationType.JSCallback     => Option(new JSCallbackInstrumenter[IO]())
@@ -360,11 +307,9 @@ object Main extends CommandIOApp(name = "swam-cli", header = "Swam from the comm
 
                 tcompiler <- swam.text.Compiler[IO](blocker)
                 module = if (wat) tcompiler.stream(file, debug, blocker) else engine.sections(file, blocker)
-                _ <- IO(println("Module parsed"))
                 _ <- if (exportInstrumented != null) {
 
                   for {
-                    _ <- IO(println("Starting coding"))
                     _ <- (Stream.emits(ModuleStream.header.toArray) ++ module
                       .through(coverageListener.instrument)
                       .through(ModuleStream.encoder.encode[IO])
@@ -389,40 +334,6 @@ object Main extends CommandIOApp(name = "swam-cli", header = "Swam from the comm
 
               } yield ExitCode.Success
 
-            case RunServer(file,
-                           args,
-                           main,
-                           wat,
-                           wasi,
-                           time,
-                           trace,
-                           filter,
-                           tracef,
-                           dirs,
-                           debug,
-                           wasiOption,
-                           covfilter,
-                           wasmArgTypes) =>
-              for {
-                tracer <- if (trace)
-                  JULTracer[IO](blocker,
-                                traceFolder = ".",
-                                traceNamePattern = tracef.toAbsolutePath().toString(),
-                                filter = filter,
-                                formatter = NoTimestampFormatter).map(Some(_))
-                else
-                  IO(None)
-                coverageListener = CoverageListener[IO](covfilter)
-                engine <- Engine[IO](blocker, tracer, listener = Option(coverageListener))
-                tcompiler <- Compiler[IO](blocker)
-                module = if (wat) tcompiler.stream(file, debug, blocker) else engine.sections(file, blocker)
-                compiled <- engine.compile(module)
-                preparedFunction <- prepareFunction(compiled, wasiOption, main, dirs, args, wasi, blocker)
-                _ <- IO(
-                  Server
-                    .listen(IO(preparedFunction), wasmArgTypes, time, file, coverageListener))
-              } yield ExitCode.Success
-
             case Decompile(file, textual, out, chunkSize) =>
               for {
                 decompiler <- if (textual)
@@ -444,12 +355,12 @@ object Main extends CommandIOApp(name = "swam-cli", header = "Swam from the comm
                   ThrowableFormat(ThrowableFormat.Depth.Full, ThrowableFormat.Indent.Fixed(2))
                 else
                   ThrowableFormat(ThrowableFormat.Depth.Fixed(0), ThrowableFormat.Indent.NoIndent)
-              val formatter = Formatter.create(throwableFormat, true)
+              val formatter = Formatter.create(throwableFormat, colorful = true)
               val logger = consoleLogger[IO](formatter = formatter)
               for {
                 engine <- Engine[IO](blocker)
                 tcompiler <- Compiler[IO](blocker)
-                module = if (wat) tcompiler.stream(file, false, blocker) else engine.sections(file, blocker)
+                module = if (wat) tcompiler.stream(file, debug = false, blocker) else engine.sections(file, blocker)
                 res <- engine.validate(module).attempt
                 _ <- res.fold(t => logger.error("Module is invalid", t), _ => logger.info("Module is valid"))
               } yield ExitCode.Success
@@ -458,50 +369,17 @@ object Main extends CommandIOApp(name = "swam-cli", header = "Swam from the comm
                 engine <- Engine[IO](blocker)
                 tcompiler <- swam.text.Compiler[IO](blocker)
                 module = if (wat) tcompiler.stream(file, false, blocker) else engine.sections(file, blocker)
-
                 compiled <- engine.compile(module)
-                names <- IO(compiled.names.flatMap(_.subsections.collectFirst { case FunctionNames(n) => n }))
-                exitCode <- IO(
-                  names match {
-                    case Some(x) => {
-                      val func = x.filter { case (idx, name) => func_name == name }
+                functionArgTypes <- swam.cli.utils.inferSignature(compiled, func_name)
+                params <- IO(functionArgTypes.map {
+                  case I32 => "Int32"
+                  case I64 => "Int64"
+                  case F32 => "Float32"
+                  case F64 => "Float64"
+                })
+                _ <- IO(println(params.mkString(",")))
+              } yield ExitCode.Success
 
-                      if (func.nonEmpty) {
-
-                        if (func.size > 1) {
-
-                          System.err.println(s"Warning $func_name has more than one definition, taking the first one")
-                        }
-
-                        val tpeidx = func.collectFirst { case (tid, _) => tid }.get
-
-                        // There is always one at this point
-                        val tpe = compiled.functions.filter(f => f.idx == tpeidx)(0).tpe
-
-                        val params = tpe.params.map {
-                          case I32 => "Int32"
-                          case I64 => "Int64"
-                          case F32 => "Float32"
-                          case F64 => "Float64"
-                        }
-                        println(params.mkString(","))
-                        ExitCode.Success
-                      } else {
-                        System.err.println(s"Function '$func_name' does not exist. Listing available functions...")
-
-                        names.foreach(f => f.foreach(e => println(s"\t${e._2}")))
-
-                        ExitCode.Error
-                      }
-                    }
-                    case None => {
-                      System.err.println(s"The module does not contain a name/metadata section")
-                      ExitCode.Error
-                    }
-                  }
-                )
-
-              } yield exitCode
             case Compile(file, out, debug) =>
               for {
                 tcompiler <- Compiler[IO](blocker)
@@ -550,13 +428,15 @@ object Main extends CommandIOApp(name = "swam-cli", header = "Swam from the comm
       .use { _ =>
         for {
           f <- preparedFunction
-          res <- if (time) measureTime(logger, f.invoke(parameters, None)) else f.invoke(parameters, None)
+          res <- if (time) measureTime(logger, f.invoke(parameters, None))
+          else f.invoke(parameters, None)
         } yield res
       }
       .unsafeRunSync()
 
   }
 
+  // TODO move this method to code_analysis module
   def measureTime[T](logger: Logger[IO], io: IO[T]): IO[T] =
     for {
       start <- Clock[IO].monotonic(TimeUnit.NANOSECONDS)
@@ -565,21 +445,4 @@ object Main extends CommandIOApp(name = "swam-cli", header = "Swam from the comm
       _ <- logger.info(s"Execution took ${end - start}ns")
     } yield res
 
-  // Create the required input vector for the instantiated Wasm function
-  def parseWasmArgs(argsTypes: List[String], args: List[String]): Vector[Value] = {
-    if (argsTypes.length != args.length)
-      throw new Exception("Number of args not equal to number of arg types!")
-    argsTypes.zipWithIndex.map {
-      case ("Int32", index) =>
-        Value.Int32(args(index).toInt)
-      case ("Int64", index) =>
-        Value.Int64(args(index).toLong)
-      case ("Float32", index) =>
-        Value.Float32(args(index).toFloat)
-      case ("Float64", index) =>
-        Value.Float64(args(index).toDouble)
-      case (unknownType, _) =>
-        throw new Exception("Type does not exist for Wasm: " + unknownType)
-    }.toVector
-  }
 }

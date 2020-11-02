@@ -69,7 +69,6 @@ class GlobalBasedCallbackInstrumenter[F[_]](val coverageMemSize: Int = 1 << 16, 
 
   def instrument(sections: Stream[F, Section]): Stream[F, Section] = {
 
-    println("Starting instrumentation")
     val r = for {
       firstPass <- sections.zipWithIndex
         .fold(GlobalBasedTransformationContext(Seq(), None, None, None, None, None, None, None, None, None, 0, 0, 50)) {
@@ -87,7 +86,6 @@ class GlobalBasedCallbackInstrumenter[F[_]](val coverageMemSize: Int = 1 << 16, 
           }
           case (ctx, (c: Section.Custom, i)) => // Patch removing custom section
             {
-              println("Parsing name section")
               c match {
                 case Section.Custom("name", _) =>
                   ctx.copy(
@@ -134,7 +132,6 @@ class GlobalBasedCallbackInstrumenter[F[_]](val coverageMemSize: Int = 1 << 16, 
       ctxExports = ctx.copy(
         names = ctx.names,
         AFLOffset = {
-          println("First pass done")
           ctx.globals match {
             case Some(g) => g._1.globals.length + 1
             case None    => 0
@@ -171,7 +168,7 @@ class GlobalBasedCallbackInstrumenter[F[_]](val coverageMemSize: Int = 1 << 16, 
               case None =>
                 Vector()
             }).concat(
-                Range(0, ctx.pad + 1).map(_ => Global(GlobalType(ValType.I32, Mut.Var), Vector(i32.Const(0))))
+                Range(0, wrappingCode.pad + 1).map(_ => Global(GlobalType(ValType.I32, Mut.Var), Vector(i32.Const(0))))
               ) // Padding control
               .concat(Range(0, blockCount).map(_ => Global(GlobalType(ValType.I32, Mut.Var), Vector(i32.Const(0)))))
           ),
@@ -180,7 +177,6 @@ class GlobalBasedCallbackInstrumenter[F[_]](val coverageMemSize: Int = 1 << 16, 
         data = Option(
           Section.Datas(
             ({
-              println("Writing the data")
               wrappingCode.data match {
                 case Some(realData) =>
                   realData._1.data
