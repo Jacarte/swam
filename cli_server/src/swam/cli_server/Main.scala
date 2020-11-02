@@ -8,8 +8,9 @@ import cats.effect.{Blocker, ExitCode, IO}
 import cats.implicits._
 import com.monovore.decline.Opts
 import com.monovore.decline.effect.CommandIOApp
-import swam.cli.Main.{inferSignature, prepareFunction, wasiOption, covfilter, debug, dirs, filter, mainFun, restArguments, time, trace, traceFile, wasi, wasmFile, wat}
+import swam.cli.Main.{prepareFunction, wasiOption, covfilter, debug, dirs, filter, mainFun, restArguments, time, trace, traceFile, wasi, wasmFile, wat}
 import swam.code_analysis.coverage.CoverageListener
+import swam.cli.utils.inferSignature
 import swam.runtime.Engine
 import swam.runtime.imports._
 import swam.runtime.trace._

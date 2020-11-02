@@ -18,8 +18,10 @@ package swam
 package cli
 
 import runtime.wasi.WasiOption
-
+import enumeratum._
 import java.nio.file.Path
+
+import swam.code_analysis.coverage.instrument.InstrumentationType
 
 sealed trait Options
 
@@ -34,7 +36,8 @@ case class Run(file: Path,
                traceFile: Path,
                dirs: List[Path],
                debug: Boolean,
-               wasiOption: WasiOption)
+               wasiOption: WasiOption,
+               wasmArgTypes: List[String])
     extends Options
 
 case class Decompile(file: Path, textual: Boolean, out: Option[Path], readChunkSize: Int) extends Options
@@ -55,8 +58,10 @@ case class WasmCov(file: Path,
                    dirs: List[Path],
                    debug: Boolean,
                    exportInstrumented: Path,
+                   instrumentationType: InstrumentationType,
                    covOut: Path,
                    filter: Boolean,
+                   wasmArgTypes: List[String],
                    wasiOption: WasiOption,
                    validate: Boolean)
     extends Options
