@@ -9,17 +9,13 @@ import org.json4s.DefaultFormats
 import org.json4s.jackson.Serialization.writePretty
 import scodec.Attempt
 import swam.binary.custom.{FunctionNames, NameSectionHandler, Names}
-import swam.code_analysis.coverage.utils.{
-  CoverageMetadaDTO,
-  GlobalBasedTransformationContext,
-  InnerTransformationContext
-}
+import swam.code_analysis.coverage.utils.{CoverageMetadaDTO, GlobalBasedTransformationContext}
 import swam.syntax._
 
 /**
   * @author Javier Cabrera-Arteaga on 2020-10-16
   */
-class GlobalBasedCallbackInstrumenter[F[_]](val coverageMemSize: Int = 1 << 16, val threshold: Int = 1)(
+class GlobalBasedCallbackInstrumenter[F[_]](val coverageMemSize: Int = 1 << 16, val threshold: Int = 0)(
     implicit F: MonadError[F, Throwable])
     extends Instrumenter[F] {
 
@@ -168,7 +164,8 @@ class GlobalBasedCallbackInstrumenter[F[_]](val coverageMemSize: Int = 1 << 16, 
               case None =>
                 Vector()
             }).concat(
-                Range(0, wrappingCode.pad + 1).map(_ => Global(GlobalType(ValType.I32, Mut.Var), Vector(i32.Const(0))))
+                Range(0, wrappingCode.pad + 1).map(_ =>
+                  Global(GlobalType(ValType.I32, Mut.Const), Vector(i32.Const(0))))
               ) // Padding control
               .concat(Range(0, blockCount).map(_ => Global(GlobalType(ValType.I32, Mut.Var), Vector(i32.Const(0)))))
           ),
