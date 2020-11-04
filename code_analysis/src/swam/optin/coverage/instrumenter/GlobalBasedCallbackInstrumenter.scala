@@ -12,7 +12,7 @@ import swam.binary.custom.{FunctionNames, NameSectionHandler, Names}
 import swam.code_analysis.coverage.utils.{
   CoverageMetadaDTO,
   GlobalBasedTransformationContext,
-  InnerTransformationContext
+  // InnerTransformationContext
 }
 import swam.syntax._
 
