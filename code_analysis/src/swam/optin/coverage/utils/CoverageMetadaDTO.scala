@@ -16,4 +16,8 @@ class CoverageMetadaDTO(val totalInstructions: Int,
                         val AFLMemOffset: Int = 0,
                         val AFLMemSize: Int = 0,
                         val blockCoverageMemOffset: Int = 0,
-                        val blockCoverageMemSize: Int = 0) {}
+                        val blockCoverageMemSize: Int = 0,
+                        val map: Vector[FunctionTreeMap]) {}
+
+class FunctionTreeMap(var children: Vector[BlockInfo] = Vector[BlockInfo](), val desc: String)
+class BlockInfo(val id: Int, var size: Int = 1)
