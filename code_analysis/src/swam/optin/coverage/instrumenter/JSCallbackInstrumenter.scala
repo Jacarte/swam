@@ -9,7 +9,7 @@ import cats.effect._
 import fs2.Stream
 import scodec.Attempt
 import swam.binary.custom.{FunctionNames, NameSectionHandler, Names}
-import swam.code_analysis.coverage.utils.{CoverageMetadaDTO, JSTransformationContext}
+import swam.code_analysis.coverage.utils.{BlockInfo, CoverageMetadaDTO, FunctionTreeMap, JSTransformationContext}
 import swam.syntax.{
   Block,
   BrIf,
@@ -26,7 +26,6 @@ import swam.syntax.{
   Section,
   i32
 }
-
 import org.json4s.DefaultFormats
 import org.json4s.jackson.Serialization.writePretty
 
@@ -212,7 +211,7 @@ class JSCallbackInstrumenter[F[_]](implicit F: MonadError[F, Throwable]) extends
     r.flatMap(t => {
 
       // Output JSON with the metadata
-      println(writePretty(new CoverageMetadaDTO(instructionCount, blockCount)))
+      println(writePretty(new CoverageMetadaDTO(instructionCount, blockCount, map = Vector[FunctionTreeMap]())))
 
       //System.err.println(s"Number of instrumented blocks $blockCount. Number of instructions $instructionCount")
 

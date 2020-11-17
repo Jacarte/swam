@@ -24,6 +24,7 @@ import swam.runtime.wasi.{Wasi, WasiOption}
 import swam.runtime.{Engine, Function, Module, Value}
 import swam.text.Compiler
 import swam.code_analysis.coverage.instrument.{
+  ExtendedGlobalBasedCallbackInstrumenter,
   GlobalBasedCallbackInstrumenter,
   InstrumentationType,
   Instrumenter,
@@ -300,6 +301,8 @@ object Main extends CommandIOApp(name = "swam-cli", header = "Swam from the comm
                   instrumentationType match {
                     case InstrumentationType.JSCallback     => Option(new JSCallbackInstrumenter[IO]())
                     case InstrumentationType.GlobalCallback => Option(new GlobalBasedCallbackInstrumenter[IO]())
+                    case InstrumentationType.ExtendedGlobalCallback =>
+                      Option(new ExtendedGlobalBasedCallbackInstrumenter[IO]())
                   }
                 else None
                 coverageListener = CoverageListener[IO](covfilter, instrumenter)

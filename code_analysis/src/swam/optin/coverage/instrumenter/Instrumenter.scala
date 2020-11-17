@@ -30,6 +30,7 @@ object InstrumentationType extends Enum[InstrumentationType] {
 
   case object JSCallback extends InstrumentationType
   case object GlobalCallback extends InstrumentationType
+  case object ExtendedGlobalCallback extends InstrumentationType
 
   def values: IndexedSeq[InstrumentationType] = findValues
 }

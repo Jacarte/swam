@@ -9,7 +9,12 @@ import org.json4s.DefaultFormats
 import org.json4s.jackson.Serialization.writePretty
 import scodec.Attempt
 import swam.binary.custom.{FunctionNames, NameSectionHandler, Names}
-import swam.code_analysis.coverage.utils.{CoverageMetadaDTO, GlobalBasedTransformationContext}
+import swam.code_analysis.coverage.utils.{
+  FunctionTreeMap,
+  CoverageMetadaDTO,
+  GlobalBasedTransformationContext,
+  BlockInfo
+}
 import swam.syntax._
 
 /**
@@ -20,32 +25,49 @@ class GlobalBasedCallbackInstrumenter[F[_]](val coverageMemSize: Int = 1 << 16, 
     extends Instrumenter[F] {
 
   var previousCount = -1
-  def instrumentVector(instr: Vector[Inst], ctx: GlobalBasedTransformationContext): Vector[Inst] = {
 
-    def addCallback(): Vector[Inst] = {
+  def addCallback(ctx: GlobalBasedTransformationContext,
+                  map: FunctionTreeMap,
+                  addToParent: Boolean = true): Vector[Inst] = {
 
-      val p = previousCount
-      previousCount = instructionCount
-      if (instructionCount - p >= threshold || p == -1) {
-        id += 1
-        blockCount += 1
-        Vector(i32.Const(1), GlobalSet(id + ctx.AFLOffset - 1 + ctx.pad))
-      } else
-        Vector()
-    }
+    val p = previousCount
+    previousCount = instructionCount
+    if (instructionCount - p >= threshold || p == -1) {
+      id += 1
+      blockCount += 1
+
+      if (map.children.nonEmpty)
+        map.children.last.size = (instructionCount - p)
+
+      val child = new BlockInfo(id)
+      map.children = map.children.appended(child)
+
+      Vector(i32.Const(1), GlobalSet(id + ctx.AFLOffset - 1 + ctx.pad))
+    } else
+      Vector()
+  }
+
+  def instrumentVector(instr: Vector[Inst],
+                       ctx: GlobalBasedTransformationContext,
+                       map: FunctionTreeMap): Vector[Inst] = {
 
     def instrumentInstruction(i: Inst, idx: Int): Vector[Inst] = {
       i match {
         case Block(tpe, instr) => {
-          Vector(Block(tpe, instrumentVector(instr, ctx))).concat(addCallback())
+          // Enter to a new map inside the block
+          val instrumented = instrumentVector(instr, ctx, map)
+          Vector(Block(tpe, instrumented)).concat(addCallback(ctx, map))
         }
         case Loop(tpe, instr) => {
-          Vector(Loop(tpe, instrumentVector(instr, ctx))).concat(addCallback())
+          Vector(Loop(tpe, instrumentVector(instr, ctx, map))).concat(addCallback(ctx, map))
         }
         case If(tpe, thn, els) =>
-          Vector(If(tpe, instrumentVector(thn, ctx), instrumentVector(els, ctx)))
+          val thenBody = instrumentVector(thn, ctx, map)
+
+          val elseBody = instrumentVector(els, ctx, map)
+          Vector(If(tpe, thenBody, elseBody))
         case BrIf(lbl) =>
-          Vector(BrIf(lbl)).concat(addCallback())
+          Vector(BrIf(lbl)).concat(addCallback(ctx, map))
         case x =>
           Vector(x)
       }
@@ -55,7 +77,7 @@ class GlobalBasedCallbackInstrumenter[F[_]](val coverageMemSize: Int = 1 << 16, 
       case (ins, i) =>
         instructionCount += 1
         if (i == 0) {
-          addCallback().concat(instrumentInstruction(ins, i))
+          addCallback(ctx, map, true).concat(instrumentInstruction(ins, i))
         } else
           instrumentInstruction(ins, i)
     }
@@ -64,7 +86,7 @@ class GlobalBasedCallbackInstrumenter[F[_]](val coverageMemSize: Int = 1 << 16, 
   implicit val formats = DefaultFormats
 
   def instrument(sections: Stream[F, Section]): Stream[F, Section] = {
-
+    var map: Vector[FunctionTreeMap] = Vector[FunctionTreeMap]()
     val r = for {
       firstPass <- sections.zipWithIndex
         .fold(GlobalBasedTransformationContext(Seq(), None, None, None, None, None, None, None, None, None, 0, 0, 50)) {
@@ -138,8 +160,11 @@ class GlobalBasedCallbackInstrumenter[F[_]](val coverageMemSize: Int = 1 << 16, 
       wrappingCode = ctxExports.copy(
         code = Option(
           (Section.Code(
-             ctxExports.code.get._1.bodies
-               .map(f => FuncBody(f.locals, instrumentVector(f.code, ctxExports)))
+             ctxExports.code.get._1.bodies.zipWithIndex.map(f => {
+               val child = new FunctionTreeMap(Vector[BlockInfo](), desc = s"f${f._2}")
+               map = map.appended(child)
+               FuncBody(f._1.locals, instrumentVector(f._1.code, ctxExports, child))
+             })
            ),
            ctxExports.code.get._2)),
         exports = Option(
@@ -164,8 +189,7 @@ class GlobalBasedCallbackInstrumenter[F[_]](val coverageMemSize: Int = 1 << 16, 
               case None =>
                 Vector()
             }).concat(
-                Range(0, wrappingCode.pad + 1).map(_ =>
-                  Global(GlobalType(ValType.I32, Mut.Const), Vector(i32.Const(0))))
+                Range(0, wrappingCode.pad + 1).map(_ => Global(GlobalType(ValType.I32, Mut.Var), Vector(i32.Const(0))))
               ) // Padding control
               .concat(Range(0, blockCount).map(_ => Global(GlobalType(ValType.I32, Mut.Var), Vector(i32.Const(0)))))
           ),
@@ -216,7 +240,8 @@ class GlobalBasedCallbackInstrumenter[F[_]](val coverageMemSize: Int = 1 << 16, 
             2,
             t.AFLOffset + t.pad,
             -1,
-            t.pad
+            t.pad,
+            map = map.sortBy(t => -1 * t.children.length)
           )))
 
       //System.err.println(s"Number of instrumented blocks $blockCount. Number of instructions $instructionCount")
